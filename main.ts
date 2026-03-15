@@ -13,7 +13,7 @@ import {
   DecorationSet,
 } from "@codemirror/view";
 
-// Regular Expression for {{kanji|kana|kana|...}} format
+// Regular Expression for {base|furi|furi|...} format
 const REGEXP =
   /{((?:[\u2E80-\uA4CF\uFF00-\uFFEF])+)((?:\\?\|[^ -\/{-~:-@\[-`]*)+)}/gm;
 
@@ -24,15 +24,16 @@ const convertFurigana = (element: Text): Node => {
   const matches = Array.from(element.textContent.matchAll(REGEXP));
   let lastNode = element;
   for (const match of matches) {
-    const furi = match[2].split("|").slice(1); // First Element will be empty
-    const kanji = furi.length === 1 ? [match[1]] : match[1].split("");
-    if (kanji.length === furi.length) {
+    const furiSegments = match[2].split("|").slice(1); // First Element will be empty
+    const baseSegments =
+      furiSegments.length === 1 ? [match[1]] : match[1].split("");
+    if (baseSegments.length === furiSegments.length) {
       // Number of Characters in first section must be equal to number of furigana sections (unless only one furigana section)
       const rubyNode = document.createElement("ruby");
       rubyNode.addClass("furi");
-      kanji.forEach((k, i) => {
-        rubyNode.appendText(k);
-        rubyNode.createEl("rt", { text: furi[i] });
+      baseSegments.forEach((baseSegment, i) => {
+        rubyNode.appendText(baseSegment);
+        rubyNode.createEl("rt", { text: furiSegments[i] });
       });
       let offset = lastNode.textContent.indexOf(match[0]);
       const nodeToReplace = lastNode.splitText(offset);
@@ -89,17 +90,17 @@ export default class MarkdownFurigana extends Plugin {
 
 class RubyWidget extends WidgetType {
   constructor(
-    readonly kanji: string[],
-    readonly furi: string[],
+    readonly baseSegments: string[],
+    readonly furiSegments: string[],
   ) {
     super();
   }
 
   toDOM(_view: EditorView): HTMLElement {
     let ruby = document.createElement("ruby");
-    this.kanji.forEach((k, i) => {
-      ruby.appendText(k);
-      ruby.createEl("rt", { text: this.furi[i] });
+    this.baseSegments.forEach((baseSegment, i) => {
+      ruby.appendText(baseSegment);
+      ruby.createEl("rt", { text: this.furiSegments[i] });
     });
     return ruby;
   }
@@ -133,8 +134,9 @@ const viewPlugin = ViewPlugin.fromClass(
         let matches = Array.from(line.text.matchAll(REGEXP));
         for (const match of matches) {
           let add = true;
-          const furi = match[2].split("|").slice(1);
-          const kanji = furi.length === 1 ? [match[1]] : match[1].split("");
+          const furiSegments = match[2].split("|").slice(1);
+          const baseSegments =
+            furiSegments.length === 1 ? [match[1]] : match[1].split("");
           const from = match.index != undefined ? match.index + line.from : -1;
           const to = from + match[0].length;
           currentSelections.forEach((r) => {
@@ -146,7 +148,9 @@ const viewPlugin = ViewPlugin.fromClass(
             builder.add(
               from,
               to,
-              Decoration.widget({ widget: new RubyWidget(kanji, furi) }),
+              Decoration.widget({
+                widget: new RubyWidget(baseSegments, furiSegments),
+              }),
             );
           }
         }
