@@ -46,7 +46,7 @@ const convertFurigana = (element: Text): Node => {
 export default class MarkdownFurigana extends Plugin {
   public postprocessor: MarkdownPostProcessor = (
     el: HTMLElement,
-    ctx: MarkdownPostProcessorContext,
+    _ctx: MarkdownPostProcessorContext,
   ) => {
     const blockToReplace = el.querySelectorAll(TAGS);
     if (blockToReplace.length === 0) return;
@@ -95,7 +95,7 @@ class RubyWidget extends WidgetType {
     super();
   }
 
-  toDOM(view: EditorView): HTMLElement {
+  toDOM(_view: EditorView): HTMLElement {
     let ruby = document.createElement("ruby");
     this.kanji.forEach((k, i) => {
       ruby.appendText(k);
@@ -119,8 +119,6 @@ const viewPlugin = ViewPlugin.fromClass(
       }
     }
 
-    destroy() {}
-
     buildDecorations(view: EditorView): DecorationSet {
       let builder = new RangeSetBuilder<Decoration>();
       let lines: number[] = [];
@@ -132,17 +130,6 @@ const viewPlugin = ViewPlugin.fromClass(
 
       for (let n of lines) {
         const line = view.state.doc.line(n);
-        const startOfLine = line.from;
-        const endOfLine = line.to;
-
-        let currentLine = false;
-
-        currentSelections.forEach((r) => {
-          if (r.to >= startOfLine && r.from <= endOfLine) {
-            currentLine = true;
-            return;
-          }
-        });
         let matches = Array.from(line.text.matchAll(REGEXP));
         for (const match of matches) {
           let add = true;
