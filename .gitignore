@@ -12,3 +12,6 @@ main.js
 
 # obsidian
 data.json
+
+# general
+.DS_Store
