@@ -83,6 +83,16 @@ Language learners often use romaji, or users might use the plugin for English tr
 {言葉|koto|ba}　`test`
 <ruby>言<rt>koto</rt>葉<rt>ba</rt></ruby>　`expected`
 
+### Callout
+
+#### Test
+
+> [!info] ライブプレビューで{正しく|ただ|}{表示|ひょう|じ}される。
+
+#### Expected
+
+<div class="el-div"><div data-callout-metadata="" data-callout-fold="" data-callout="info" class="callout"><div class="callout-title" dir="auto"><div class="callout-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="svg-icon lucide-info"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg></div><div class="callout-title-inner">ライブプレビューで<ruby>正<rt style="user-select: none;">ただ</rt>し<rt style="user-select: none;"></rt>く</ruby><ruby>表<rt style="user-select: none;">ひょう</rt>示<rt style="user-select: none;">じ</rt></ruby>される。</div></div></div></div>
+
 ### Code / "Escaped"
 
 Because of how escapes are handled by obsidian, the only effective way to display the format without rendering it is using code and code blocks, where it is directly disabled.
@@ -92,13 +102,15 @@ The expected results have extra invisible spaces to ensure they render correctly
 `{言葉|こと|ば}`　`test`
 `{​言葉|こと|ば​}`　`expected`
 
-`test`
+### Codeblock
+
+#### Test
 
 ```md
 {言葉|こと|ば}
 ```
 
-`expected`
+#### Expected
 
 ```md
 {​言葉|こと|ば​}
