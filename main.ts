@@ -13,9 +13,60 @@ import {
   DecorationSet,
 } from "@codemirror/view";
 
-// Regular Expression for {base|furi|furi|...} format
-const REGEXP =
-  /{((?:[\u2E80-\uA4CF\uFF00-\uFFEF])+)((?:\\?\|[^ -\/{-~:-@\[-`]*)+)}/gm;
+type WrapperPair = [string, string];
+
+const FURI_WRAPPERS: WrapperPair[] = [
+  ["{", "}"],
+  ["＜", "＞"],
+  ["《", "》"],
+];
+
+const FURI_SEPARATORS = ["|", "｜"];
+
+/**
+ * Escapes special regex characters in a string to treat them as literals.
+ */
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Build the global furigana RegExp from provided wrappers and separators.
+ */
+function buildFuriganaRegex(
+  wrappers: WrapperPair[],
+  separators: string[],
+): RegExp[] {
+  // Build the separator pattern.
+  const separatorPattern = [...separators].map(escapeRegex).join("|");
+
+  // 2. Build Wrapper Patterns
+  const openPattern = wrappers.map((w) => escapeRegex(w[0])).join("|");
+  const closePattern = wrappers.map((w) => escapeRegex(w[1])).join("|");
+  const closeChars = escapeRegex(wrappers.map((w) => w[1]).join(""));
+
+  // Assemble the full furigana regex string
+  const regexPattern =
+    // Open Wrapper(s)
+    `(?<!\\\\)(?:${openPattern})` +
+    // Capture Group 1: Base characters (e.g. Kanji) Excluding Separators
+    `((?:(?!${separatorPattern})[\\u2E80-\\uA4CF\\uFF00-\\uFFEF])+)` +
+    // Capture Group 2: Furigana sections
+    `((?:(?:${separatorPattern})[^${closeChars}]*)+)` +
+    // Close Wrapper(s)
+    `(?<!\\\\)(?:${closePattern})`;
+
+  const furiRegex = new RegExp(regexPattern, "gm");
+  const separatorRegex = new RegExp(separatorPattern);
+
+  return [furiRegex, separatorRegex];
+}
+
+// Regular Expression for {{base|furi|furi|...}} format
+const [FURI_REGEX, SEPARATOR_REGEX] = buildFuriganaRegex(
+  FURI_WRAPPERS,
+  FURI_SEPARATORS,
+);
 
 interface FuriganaSegment {
   base: string;
@@ -30,7 +81,7 @@ function parseFurigana(
   furiString: string,
 ): FuriganaSegment[] {
   // The first index will be empty, as the separator is included in the REGEX.
-  const furi = furiString.split("|").slice(1);
+  const furi = furiString.split(SEPARATOR_REGEX).slice(1);
   const segments: FuriganaSegment[] = [];
 
   if (furi.length === 1) {
@@ -84,7 +135,7 @@ function renderFurigana(baseString: string, furiString: string): HTMLElement {
  * disrupting surrounding sibling nodes. Used for the Live Preview view.
  */
 const convertFurigana = (element: Text): Node => {
-  const matches = Array.from(element.textContent?.matchAll(REGEXP) || []);
+  const matches = Array.from(element.textContent?.matchAll(FURI_REGEX) || []);
   let lastNode = element;
   for (const match of matches) {
     const container = renderFurigana(match[1], match[2]);
@@ -175,7 +226,7 @@ class FuriganaViewPlugin {
 
     for (let n of lines) {
       const line = view.state.doc.line(n);
-      let matches = Array.from(line.text.matchAll(REGEXP));
+      let matches = Array.from(line.text.matchAll(FURI_REGEX));
       for (const match of matches) {
         const [_fullMatch, baseString, furiString] = match;
 
