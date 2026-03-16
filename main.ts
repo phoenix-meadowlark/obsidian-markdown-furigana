@@ -2,6 +2,7 @@ import {
   Plugin,
   MarkdownPostProcessor,
   MarkdownPostProcessorContext,
+  editorLivePreviewField,
 } from "obsidian";
 import { RangeSetBuilder } from "@codemirror/state";
 import {
@@ -150,6 +151,9 @@ const convertFurigana = (element: Text): Node => {
 };
 
 export default class MarkdownFurigana extends Plugin {
+  // Required to dynamically toggle Editor Extension without reloading plugin
+  extension: ViewPlugin<FuriganaViewPlugin>[] = [];
+
   public postprocessor: MarkdownPostProcessor = (
     el: HTMLElement,
     _ctx: MarkdownPostProcessorContext,
@@ -181,6 +185,9 @@ export default class MarkdownFurigana extends Plugin {
   async onload() {
     console.log("loading Markdown Furigana plugin");
     this.registerMarkdownPostProcessor(this.postprocessor);
+
+    // Register the extension permanently.
+    // The extension will self-regulate based on editorLivePreviewField.
     this.registerEditorExtension(viewPlugin);
   }
 
@@ -197,6 +204,14 @@ class RubyWidget extends WidgetType {
     super();
   }
 
+  // Allows CodeMirror to optimize and skip re-rendering identical widgets
+  eq(other: RubyWidget) {
+    return (
+      this.baseString === other.baseString &&
+      this.furiString === other.furiString
+    );
+  }
+
   toDOM(_view: EditorView): HTMLElement {
     return renderFurigana(this.baseString, this.furiString);
   }
@@ -210,7 +225,17 @@ class FuriganaViewPlugin {
   }
 
   update(update: ViewUpdate) {
-    if (update.docChanged || update.viewportChanged || update.selectionSet) {
+    // Check if the source mode toggle was flipped
+    const layoutChanged =
+      update.startState.field(editorLivePreviewField) !==
+      update.state.field(editorLivePreviewField);
+
+    if (
+      update.docChanged ||
+      update.viewportChanged ||
+      update.selectionSet ||
+      layoutChanged
+    ) {
       this.decorations = this.buildDecorations(update.view);
     }
   }
@@ -223,6 +248,7 @@ class FuriganaViewPlugin {
     }
 
     const currentSelections = [...view.state.selection.ranges];
+    const isLivePreview = view.state.field(editorLivePreviewField);
 
     for (let n of lines) {
       const line = view.state.doc.line(n);
@@ -241,15 +267,15 @@ class FuriganaViewPlugin {
             isEditing = true;
           }
         });
-        if (!isEditing) {
-          builder.add(
+        if (isLivePreview && !isEditing) {
+        builder.add(
             from,
             to,
-            Decoration.widget({
+          Decoration.widget({
               widget: new RubyWidget(baseString, furiString),
-            }),
-          );
-        }
+          }),
+        );
+      }
       }
     }
     return builder.finish();
