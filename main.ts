@@ -178,23 +178,27 @@ class FuriganaViewPlugin {
       let matches = Array.from(line.text.matchAll(REGEXP));
       for (const match of matches) {
         const [_fullMatch, baseString, furiString] = match;
-        let add = true;
-          const from = match.index != undefined ? match.index + line.from : -1;
-          const to = from + match[0].length;
-          currentSelections.forEach((r) => {
-            if (r.to >= from && r.from <= to) {
-            add = false;
-            }
-          });
-        if (add) {
-        builder.add(
+
+        // Calculate global document positions for this furigana match
+        const from = match.index != undefined ? match.index + line.from : -1;
+        const to = from + match[0].length;
+
+        // Check if the cursor is actively touching/editing this specific block
+        let isEditing = false;
+        currentSelections.forEach((r) => {
+          if (r.to >= from && r.from <= to) {
+            isEditing = true;
+          }
+        });
+        if (!isEditing) {
+          builder.add(
             from,
             to,
-          Decoration.widget({
+            Decoration.widget({
               widget: new RubyWidget(baseString, furiString),
-          }),
-        );
-      }
+            }),
+          );
+        }
       }
     }
     return builder.finish();
