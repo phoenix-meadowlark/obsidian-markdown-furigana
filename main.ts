@@ -230,6 +230,11 @@ class RubyWidget extends WidgetType {
     return true;
   }
 
+  // Allow for clicking on rendered kanji+furigana in Live Preview.
+  ignoreEvent(event: Event): boolean {
+    return event.type !== "mousedown" && event.type !== "click";
+  }
+
   toDOM(_view: EditorView): HTMLElement {
     return renderFurigana(this.furiPairs);
   }
