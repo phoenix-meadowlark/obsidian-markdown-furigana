@@ -13,6 +13,7 @@ import {
   Decoration,
   DecorationSet,
 } from "@codemirror/view";
+import { syntaxTree } from "@codemirror/language";
 
 type WrapperPair = [string, string];
 
@@ -273,6 +274,12 @@ class FuriganaViewPlugin {
         // Calculate global document positions for this furigana match
         const from = match.index != undefined ? match.index + line.from : -1;
         const to = from + match[0].length;
+
+        // Skip rendering inside of code blocks, mirroring the Reading View.
+        const node = syntaxTree(view.state).resolveInner(from, 1);
+        if (node.name.includes("code")) {
+          continue;
+        }
 
         // Check if the cursor is actively touching/editing this specific block
         let isEditing = false;
