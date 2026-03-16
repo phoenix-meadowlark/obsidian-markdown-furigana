@@ -69,7 +69,10 @@ const [FURI_REGEX, SEPARATOR_REGEX] = buildFuriganaRegex(
   FURI_SEPARATORS,
 );
 
-interface FuriganaSegment {
+/**
+ * Pairs a base of one or more characters with their furigana.
+ */
+interface FuriganaPair {
   base: string;
   furi?: string;
 }
@@ -80,53 +83,51 @@ interface FuriganaSegment {
 function parseFurigana(
   baseString: string,
   furiString: string,
-): FuriganaSegment[] {
+): FuriganaPair[] | null {
   // The first index will be empty, as the separator is included in the REGEX.
-  const furi = furiString.split(SEPARATOR_REGEX).slice(1);
-  const segments: FuriganaSegment[] = [];
+  const furiGroups = furiString.split(SEPARATOR_REGEX).slice(1);
+  const furiPairs: FuriganaPair[] = [];
 
-  if (furi.length === 1) {
-    segments.push({ base: baseString, furi: furi[0] });
-    return segments;
+  if (furiGroups.length === 1) {
+    furiPairs.push({ base: baseString, furi: furiGroups[0] });
+    return furiPairs;
   }
 
   // Use character-by-character mapping for multiple pipes
-  const baseChars = baseString.split("");
-  for (let i = 0; i < baseChars.length; i++) {
-    // In cases where baseChars.length > furi.length, undefined is used to
-    // prevent extra empty <rt> tags from being generated. For example:
+  const baseGroups = baseString.split("");
+
+  // If syntax is invalid (e.g., {紫|む|ら|さ|き}), return null to skip rendering
+  if (furiGroups.length > baseGroups.length) return null;
+
+  for (let i = 0; i < baseGroups.length; i++) {
+    // In cases where baseGroups.length > furiGroups.length, undefined is used
+    // to prevent extra empty <rt> tags from being generated. For example:
     //   {打ち合わせる|う||あ}
-    //   baseChars = ["打", "ち", "合", "わ", "せ", "る"]
-    //   furi = ["う", "", "あ"]
+    //   baseGroups = ["打", "ち", "合", "わ", "せ", "る"]
+    //   furiGroups = ["う", "", "あ"]
     //   <ruby>　打<rt>う</rt>　ち<rt></rt>　合<rt>あ</rt>　わせる</ruby>
-    segments.push({
-      base: baseChars[i],
-      furi: furi[i],
-    });
+    furiPairs.push({ base: baseGroups[i], furi: furiGroups[i] });
   }
 
-  return segments;
+  return furiPairs;
 }
 
 /**
  * Unified DOM node creation for both implementations.
  */
-function renderFurigana(baseString: string, furiString: string): HTMLElement {
-  const segments = parseFurigana(baseString, furiString);
+function renderFurigana(furiPairs: FuriganaPair[]): HTMLElement {
   const ruby = document.createElement("ruby");
-
-  segments.forEach((seg) => {
-    if (seg.furi !== undefined) {
-      ruby.appendText(seg.base);
-      const rt = ruby.createEl("rt", { text: seg.furi });
+  furiPairs.forEach((pair) => {
+    if (pair.furi !== undefined) {
+      ruby.appendText(pair.base);
+      const rt = ruby.createEl("rt", { text: pair.furi });
       // Make the furigana unselectable to prevent selection ruining
       rt.style.userSelect = "none";
     } else {
       // Append text directly to avoid generating empty <rt> tags
-      ruby.append(seg.base);
+      ruby.append(pair.base);
     }
   });
-
   return ruby;
 }
 
@@ -139,7 +140,11 @@ const convertFurigana = (element: Text): Node => {
   const matches = Array.from(element.textContent?.matchAll(FURI_REGEX) || []);
   let lastNode = element;
   for (const match of matches) {
-    const container = renderFurigana(match[1], match[2]);
+    const [_fullMatch, baseString, furiString] = match;
+    const furiPairs = parseFurigana(baseString, furiString);
+    if (!furiPairs) continue; // Skip rendering invalid furigana.
+
+    const container = renderFurigana(furiPairs);
     let offset = lastNode.textContent?.indexOf(match[0]) ?? -1;
     if (offset === -1) continue;
 
@@ -197,23 +202,30 @@ export default class MarkdownFurigana extends Plugin {
 }
 
 class RubyWidget extends WidgetType {
-  constructor(
-    readonly baseString: string,
-    readonly furiString: string,
-  ) {
+  constructor(readonly furiPairs: FuriganaPair[]) {
     super();
   }
 
   // Allows CodeMirror to optimize and skip re-rendering identical widgets
-  eq(other: RubyWidget) {
-    return (
-      this.baseString === other.baseString &&
-      this.furiString === other.furiString
-    );
+  eq(other: RubyWidget): boolean {
+    if (this.furiPairs.length !== other.furiPairs.length) {
+      return false;
+    }
+
+    for (let i = 0; i < this.furiPairs.length; i++) {
+      if (
+        this.furiPairs[i].base !== other.furiPairs[i].base ||
+        this.furiPairs[i].furi !== other.furiPairs[i].furi
+      ) {
+        return false;
+      }
+    }
+
+    return true;
   }
 
   toDOM(_view: EditorView): HTMLElement {
-    return renderFurigana(this.baseString, this.furiString);
+    return renderFurigana(this.furiPairs);
   }
 }
 
@@ -255,6 +267,8 @@ class FuriganaViewPlugin {
       let matches = Array.from(line.text.matchAll(FURI_REGEX));
       for (const match of matches) {
         const [_fullMatch, baseString, furiString] = match;
+        const furiPairs = parseFurigana(baseString, furiString);
+        if (!furiPairs) continue; // Skip rendering invalid furigana.
 
         // Calculate global document positions for this furigana match
         const from = match.index != undefined ? match.index + line.from : -1;
@@ -268,14 +282,14 @@ class FuriganaViewPlugin {
           }
         });
         if (isLivePreview && !isEditing) {
-        builder.add(
+          builder.add(
             from,
             to,
-          Decoration.widget({
-              widget: new RubyWidget(baseString, furiString),
-          }),
-        );
-      }
+            Decoration.widget({
+              widget: new RubyWidget(furiPairs),
+            }),
+          );
+        }
       }
     }
     return builder.finish();
