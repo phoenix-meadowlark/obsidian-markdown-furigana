@@ -42,20 +42,20 @@ function buildFuriganaRegex(
   // Build the separator pattern.
   const separatorPattern = [...separators].map(escapeRegex).join("|");
 
-  // 2. Build Wrapper Patterns
+  // Build the wrapper patterns.
   const openPattern = wrappers.map((w) => escapeRegex(w[0])).join("|");
   const closePattern = wrappers.map((w) => escapeRegex(w[1])).join("|");
   const closeChars = escapeRegex(wrappers.map((w) => w[1]).join(""));
 
-  // Assemble the full furigana regex string
+  // Assemble the full furigana regex string.
   const regexPattern =
-    // Open Wrapper(s)
+    // Open wrapper(s)
     `(?<!\\\\)(?:${openPattern})` +
-    // Capture Group 1: Base characters (e.g. Kanji) Excluding Separators
+    // Capture Group 1: Base characters (e.g. Kanji) excluding separators
     `((?:(?!${separatorPattern})[\\u2E80-\\uA4CF\\uFF00-\\uFFEF])+)` +
     // Capture Group 2: Furigana sections
     `((?:(?:${separatorPattern})[^${closeChars}]*)+)` +
-    // Close Wrapper(s)
+    // Close wrapper(s)
     `(?<!\\\\)(?:${closePattern})`;
 
   const furiRegex = new RegExp(regexPattern, "gm");
@@ -64,7 +64,7 @@ function buildFuriganaRegex(
   return [furiRegex, separatorRegex];
 }
 
-// Regular Expression for {{base|furi|furi|...}} format
+// Regular Expression for the {{base|furi|furi|...}} format.
 const [FURI_REGEX, SEPARATOR_REGEX] = buildFuriganaRegex(
   FURI_WRAPPERS,
   FURI_SEPARATORS,
@@ -94,10 +94,10 @@ function parseFurigana(
     return furiPairs;
   }
 
-  // Use character-by-character mapping for multiple pipes
+  // Use character-by-character mapping for multiple pipes.
   const baseGroups = baseString.split("");
 
-  // If syntax is invalid (e.g., {紫|む|ら|さ|き}), return null to skip rendering
+  // If syntax is invalid (e.g. {紫|む|ら|さ|き}), return null to skip rendering.
   if (furiGroups.length > baseGroups.length) return null;
 
   for (let i = 0; i < baseGroups.length; i++) {
@@ -127,10 +127,10 @@ function renderFurigana(furiPairs: FuriganaPair[]): HTMLElement {
       // copied as coherent sentences.
       rt.style.userSelect = "none"; // Desktop
       rt.style.setProperty("-webkit-user-select", "none"); // iOS Safari
-      // Prevent the iOS long-press magnifying glass and context menu
+      // Prevent the iOS long-press magnifying glass and context menu.
       rt.style.setProperty("-webkit-touch-callout", "none");
     } else {
-      // Append text directly to avoid generating empty <rt> tags
+      // Append text directly to avoid generating empty <rt> tags.
       ruby.append(pair.base);
     }
   });
@@ -151,7 +151,7 @@ const convertFurigana = (element: Text): Node => {
     if (!furiPairs) continue; // Skip rendering invalid furigana.
 
     const container = renderFurigana(furiPairs);
-    let offset = lastNode.textContent?.indexOf(match[0]) ?? -1;
+    const offset = lastNode.textContent?.indexOf(match[0]) ?? -1;
     if (offset === -1) continue;
 
     const nodeToReplace = lastNode.splitText(offset);
@@ -162,7 +162,7 @@ const convertFurigana = (element: Text): Node => {
 };
 
 export default class MarkdownFurigana extends Plugin {
-  // Required to dynamically toggle Editor Extension without reloading plugin
+  // Required to dynamically toggle Editor Extension without reloading plugin.
   extension: ViewPlugin<FuriganaViewPlugin>[] = [];
 
   public postprocessor: MarkdownPostProcessor = (
@@ -180,7 +180,7 @@ export default class MarkdownFurigana extends Plugin {
           child.nodeName !== "CODE" &&
           child.nodeName !== "RUBY"
         ) {
-          // Ignore content in Code Blocks and already rendered Ruby tags
+          // Ignore content in Code Blocks and already rendered Ruby tags.
           replace(child);
         }
       });
@@ -189,7 +189,7 @@ export default class MarkdownFurigana extends Plugin {
       });
     }
 
-    // Begin recursive traversal from the absolute root of the passed fragment
+    // Begin recursive traversal from the absolute root of the passed fragment.
     replace(el);
   };
 
@@ -212,7 +212,7 @@ class RubyWidget extends WidgetType {
     super();
   }
 
-  // Allows CodeMirror to optimize and skip re-rendering identical widgets
+  // Allows CodeMirror to optimize and skip re-rendering identical widgets.
   eq(other: RubyWidget): boolean {
     if (this.furiPairs.length !== other.furiPairs.length) {
       return false;
@@ -241,22 +241,22 @@ class RubyWidget extends WidgetType {
 }
 
 // Phantom Widget to prevent lines from jumping around when switching between
-// Source Mode and Live Preview, and when editing the furigana in Live Preview
+// Source Mode and Live Preview, and when editing the furigana in Live Preview.
 class PhantomRubyWidget extends WidgetType {
   toDOM(_view: EditorView): HTMLElement {
     // Create a zero-width wrapper to avoid placing display: inline-block
-    // on the ruby element itself
+    // on the ruby element itself.
     const wrapper = document.createElement("span");
     wrapper.addClass("phantom-ruby-widget");
     wrapper.style.display = "inline-block";
     wrapper.style.width = "0px";
-    // Prevent the 0-width box from forcing the text to wrap to a new line
+    // Prevent the 0-width box from forcing the text to wrap to a new line.
     wrapper.style.whiteSpace = "nowrap";
-    // Hide the bleeding content from the user and the cursor
+    // Hide the bleeding content from the user and the cursor.
     wrapper.style.visibility = "hidden";
 
     // Build the ruby element inside the zero-width wrapper, using real
-    // characters to guarantee the browser calculates the true bounds
+    // characters to guarantee the browser calculates the true bounds.
     const ruby = wrapper.createEl("ruby");
     ruby.appendText("奏");
     ruby.createEl("rt", { text: "あ" });
@@ -273,7 +273,7 @@ class FuriganaViewPlugin {
   }
 
   update(update: ViewUpdate) {
-    // Check if the source mode toggle was flipped
+    // Check if the source mode toggle was flipped.
     const layoutChanged =
       update.startState.field(editorLivePreviewField) !==
       update.state.field(editorLivePreviewField);
@@ -289,7 +289,7 @@ class FuriganaViewPlugin {
   }
 
   buildDecorations(view: EditorView): DecorationSet {
-    let builder = new RangeSetBuilder<Decoration>();
+    const builder = new RangeSetBuilder<Decoration>();
     let lines: number[] = [];
     if (view.state.doc.length > 0) {
       lines = Array.from({ length: view.state.doc.lines }, (_, i) => i + 1);
@@ -298,21 +298,25 @@ class FuriganaViewPlugin {
     const currentSelections = [...view.state.selection.ranges];
     const isLivePreview = view.state.field(editorLivePreviewField);
 
-    for (let n of lines) {
+    for (const n of lines) {
       const line = view.state.doc.line(n);
+      const matches = Array.from(line.text.matchAll(FURI_REGEX));
 
-      let matches = Array.from(line.text.matchAll(FURI_REGEX));
       // Valid furigana groups are not rendered if a user selects them in
       // Live Preview mode, or if Source Mode is enabled.
       let addPhantomWidget = false;
-      let widgetsToAdd = [];
+      const widgetsToAdd: {
+        from: number;
+        to: number;
+        furiPairs: FuriganaPair[];
+      }[] = [];
 
       for (const match of matches) {
         const [_fullMatch, baseString, furiString] = match;
         const furiPairs = parseFurigana(baseString, furiString);
         if (!furiPairs) continue; // Skip rendering invalid furigana.
 
-        // Calculate global document positions for this furigana match
+        // Calculate global document positions for this furigana match.
         const from = match.index != undefined ? match.index + line.from : -1;
         const to = from + match[0].length;
 
@@ -322,13 +326,11 @@ class FuriganaViewPlugin {
           continue;
         }
 
-        // Check if the cursor is actively touching/editing this specific block
-        let isEditing = false;
-        currentSelections.forEach((r) => {
-          if (r.to >= from && r.from <= to) {
-            isEditing = true;
-          }
-        });
+        // Check if the cursor is actively touching/editing this specific block.
+        const isEditing = currentSelections.some(
+          (r) => r.to >= from && r.from <= to
+        );
+
         if (!isLivePreview || isEditing) {
           addPhantomWidget = true;
         } else {
@@ -344,7 +346,7 @@ class FuriganaViewPlugin {
           line.from,
           Decoration.widget({
             widget: new PhantomRubyWidget(),
-            side: -1, // Ensures it sits at the absolute start of the line
+            side: -1, // Ensure it sits at the absolute start of the line.
           }),
         );
       }
