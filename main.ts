@@ -79,7 +79,7 @@ interface FuriganaPair {
 }
 
 /**
- * Unified parsing logic for both Reading view and Live Preview.
+ * Unified parsing logic for both Reading View and Live Preview.
  */
 function parseFurigana(
   baseString: string,
@@ -122,8 +122,13 @@ function renderFurigana(furiPairs: FuriganaPair[]): HTMLElement {
     if (pair.furi !== undefined) {
       ruby.appendText(pair.base);
       const rt = ruby.createEl("rt", { text: pair.furi });
-      // Make the furigana unselectable to prevent selection ruining
-      rt.style.userSelect = "none";
+
+      // Prevent furigana selection to allow the Reading View content to be
+      // copied as coherent sentences.
+      rt.style.userSelect = "none"; // Desktop
+      rt.style.setProperty("-webkit-user-select", "none"); // iOS Safari
+      // Prevent the iOS long-press magnifying glass and context menu
+      rt.style.setProperty("-webkit-touch-callout", "none");
     } else {
       // Append text directly to avoid generating empty <rt> tags
       ruby.append(pair.base);
@@ -135,7 +140,7 @@ function renderFurigana(furiPairs: FuriganaPair[]): HTMLElement {
 /**
  * Scans a given text node for furigana syntax, replaces matches with rendered
  * HTML elements, and handles the localized DOM mutations inline without
- * disrupting surrounding sibling nodes. Used for the Reading view.
+ * disrupting surrounding sibling nodes. Used for the Reading View.
  */
 const convertFurigana = (element: Text): Node => {
   const matches = Array.from(element.textContent?.matchAll(FURI_REGEX) || []);
@@ -344,7 +349,7 @@ class FuriganaViewPlugin {
           widget.from,
           widget.to,
           Decoration.widget({
-            widget: new RubyWidget(widget.furiPairs)
+            widget: new RubyWidget(widget.furiPairs),
           }),
         );
       }
