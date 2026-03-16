@@ -17,9 +17,6 @@ import {
 const REGEXP =
   /{((?:[\u2E80-\uA4CF\uFF00-\uFFEF])+)((?:\\?\|[^ -\/{-~:-@\[-`]*)+)}/gm;
 
-// Main Tags to search for Furigana Syntax
-const TAGS = "p, h1, h2, h3, h4, h5, h6, ol, ul, table";
-
 interface FuriganaSegment {
   base: string;
   furi?: string;
@@ -106,9 +103,6 @@ export default class MarkdownFurigana extends Plugin {
     el: HTMLElement,
     _ctx: MarkdownPostProcessorContext,
   ) => {
-    const blockToReplace = el.querySelectorAll(TAGS);
-    if (blockToReplace.length === 0) return;
-
     function replace(node: Node) {
       const childrenToReplace: Text[] = [];
       node.childNodes.forEach((child) => {
@@ -120,7 +114,7 @@ export default class MarkdownFurigana extends Plugin {
           child.nodeName !== "CODE" &&
           child.nodeName !== "RUBY"
         ) {
-          // Ignore content in Code Blocks
+          // Ignore content in Code Blocks and already rendered Ruby tags
           replace(child);
         }
       });
@@ -129,9 +123,8 @@ export default class MarkdownFurigana extends Plugin {
       });
     }
 
-    blockToReplace.forEach((block) => {
-      replace(block);
-    });
+    // Begin recursive traversal from the absolute root of the passed fragment
+    replace(el);
   };
 
   async onload() {
@@ -186,22 +179,22 @@ class FuriganaViewPlugin {
       for (const match of matches) {
         const [_fullMatch, baseString, furiString] = match;
         let add = true;
-        const from = match.index != undefined ? match.index + line.from : -1;
-        const to = from + match[0].length;
-        currentSelections.forEach((r) => {
-          if (r.to >= from && r.from <= to) {
+          const from = match.index != undefined ? match.index + line.from : -1;
+          const to = from + match[0].length;
+          currentSelections.forEach((r) => {
+            if (r.to >= from && r.from <= to) {
             add = false;
-          }
-        });
+            }
+          });
         if (add) {
-          builder.add(
+        builder.add(
             from,
             to,
-            Decoration.widget({
+          Decoration.widget({
               widget: new RubyWidget(baseString, furiString),
-            }),
-          );
-        }
+          }),
+        );
+      }
       }
     }
     return builder.finish();
