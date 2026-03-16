@@ -83,6 +83,16 @@ Language learners often use romaji, or users might use the plugin for English tr
 {言葉|koto|ba}　`test`
 <ruby>言<rt>koto</rt>葉<rt>ba</rt></ruby>　`expected`
 
+### Roman Numbers Test
+
+{１日目|いち|nichi|め}　`test`
+<ruby>１<rt>いち</rt>日<rt>nichi</rt>目<rt>め</rt></ruby>　`expected`
+
+Using half-width characters isn't supported.
+
+{1日目|いち|nichi|め}　`test`
+{​1日目|いち|nichi|め​}　`expected`
+
 ### Callout
 
 #### Test
