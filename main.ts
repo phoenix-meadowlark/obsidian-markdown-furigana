@@ -158,57 +158,56 @@ class RubyWidget extends WidgetType {
   }
 }
 
-const viewPlugin = ViewPlugin.fromClass(
-  class {
-    decorations: DecorationSet;
+class FuriganaViewPlugin {
+  decorations: DecorationSet;
 
-    constructor(view: EditorView) {
-      this.decorations = this.buildDecorations(view);
+  constructor(view: EditorView) {
+    this.decorations = this.buildDecorations(view);
+  }
+
+  update(update: ViewUpdate) {
+    if (update.docChanged || update.viewportChanged || update.selectionSet) {
+      this.decorations = this.buildDecorations(update.view);
+    }
+  }
+
+  buildDecorations(view: EditorView): DecorationSet {
+    let builder = new RangeSetBuilder<Decoration>();
+    let lines: number[] = [];
+    if (view.state.doc.length > 0) {
+      lines = Array.from({ length: view.state.doc.lines }, (_, i) => i + 1);
     }
 
-    update(update: ViewUpdate) {
-      if (update.docChanged || update.viewportChanged || update.selectionSet) {
-        this.decorations = this.buildDecorations(update.view);
-      }
-    }
+    const currentSelections = [...view.state.selection.ranges];
 
-    buildDecorations(view: EditorView): DecorationSet {
-      let builder = new RangeSetBuilder<Decoration>();
-      let lines: number[] = [];
-      if (view.state.doc.length > 0) {
-        lines = Array.from({ length: view.state.doc.lines }, (_, i) => i + 1);
-      }
-
-      const currentSelections = [...view.state.selection.ranges];
-
-      for (let n of lines) {
-        const line = view.state.doc.line(n);
-        let matches = Array.from(line.text.matchAll(REGEXP));
-        for (const match of matches) {
-          const [_fullMatch, baseString, furiString] = match;
-          let add = true;
-          const from = match.index != undefined ? match.index + line.from : -1;
-          const to = from + match[0].length;
-          currentSelections.forEach((r) => {
-            if (r.to >= from && r.from <= to) {
-              add = false;
-            }
-          });
-          if (add) {
-            builder.add(
-              from,
-              to,
-              Decoration.widget({
-                widget: new RubyWidget(baseString, furiString),
-              }),
-            );
+    for (let n of lines) {
+      const line = view.state.doc.line(n);
+      let matches = Array.from(line.text.matchAll(REGEXP));
+      for (const match of matches) {
+        const [_fullMatch, baseString, furiString] = match;
+        let add = true;
+        const from = match.index != undefined ? match.index + line.from : -1;
+        const to = from + match[0].length;
+        currentSelections.forEach((r) => {
+          if (r.to >= from && r.from <= to) {
+            add = false;
           }
+        });
+        if (add) {
+          builder.add(
+            from,
+            to,
+            Decoration.widget({
+              widget: new RubyWidget(baseString, furiString),
+            }),
+          );
         }
       }
-      return builder.finish();
     }
-  },
-  {
-    decorations: (v) => v.decorations,
-  },
-);
+    return builder.finish();
+  }
+}
+
+const viewPlugin = ViewPlugin.fromClass(FuriganaViewPlugin, {
+  decorations: (v) => v.decorations,
+});
