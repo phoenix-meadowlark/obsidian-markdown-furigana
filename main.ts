@@ -79,7 +79,7 @@ interface FuriganaPair {
 }
 
 /**
- * Unified parsing logic for both Reading Mode and Live Preview.
+ * Unified parsing logic for both Reading view and Live Preview.
  */
 function parseFurigana(
   baseString: string,
@@ -135,7 +135,7 @@ function renderFurigana(furiPairs: FuriganaPair[]): HTMLElement {
 /**
  * Scans a given text node for furigana syntax, replaces matches with rendered
  * HTML elements, and handles the localized DOM mutations inline without
- * disrupting surrounding sibling nodes. Used for the Live Preview view.
+ * disrupting surrounding sibling nodes. Used for the Reading view.
  */
 const convertFurigana = (element: Text): Node => {
   const matches = Array.from(element.textContent?.matchAll(FURI_REGEX) || []);
@@ -230,6 +230,31 @@ class RubyWidget extends WidgetType {
   }
 }
 
+// Phantom Widget to prevent lines from jumping around when switching between
+// Source Mode and Live Preview, and when editing the furigana in Live Preview
+class PhantomRubyWidget extends WidgetType {
+  toDOM(_view: EditorView): HTMLElement {
+    // Create a zero-width wrapper to avoid placing display: inline-block
+    // on the ruby element itself
+    const wrapper = document.createElement("span");
+    wrapper.addClass("phantom-ruby-widget");
+    wrapper.style.display = "inline-block";
+    wrapper.style.width = "0px";
+    // Prevent the 0-width box from forcing the text to wrap to a new line
+    wrapper.style.whiteSpace = "nowrap";
+    // Hide the bleeding content from the user and the cursor
+    wrapper.style.visibility = "hidden";
+
+    // Build the ruby element inside the zero-width wrapper, using real
+    // characters to guarantee the browser calculates the true bounds
+    const ruby = wrapper.createEl("ruby");
+    ruby.appendText("奏");
+    ruby.createEl("rt", { text: "あ" });
+
+    return wrapper;
+  }
+}
+
 class FuriganaViewPlugin {
   decorations: DecorationSet;
 
@@ -265,7 +290,13 @@ class FuriganaViewPlugin {
 
     for (let n of lines) {
       const line = view.state.doc.line(n);
+
       let matches = Array.from(line.text.matchAll(FURI_REGEX));
+      // Valid furigana groups are not rendered if a user selects them in
+      // Live Preview mode, or if Source Mode is enabled.
+      let addPhantomWidget = false;
+      let widgetsToAdd = [];
+
       for (const match of matches) {
         const [_fullMatch, baseString, furiString] = match;
         const furiPairs = parseFurigana(baseString, furiString);
@@ -288,15 +319,34 @@ class FuriganaViewPlugin {
             isEditing = true;
           }
         });
-        if (isLivePreview && !isEditing) {
-          builder.add(
-            from,
-            to,
-            Decoration.widget({
-              widget: new RubyWidget(furiPairs),
-            }),
-          );
+        if (!isLivePreview || isEditing) {
+          addPhantomWidget = true;
+        } else {
+          widgetsToAdd.push({ from, to, furiPairs });
         }
+      }
+
+      // If the line has unrendered valid furigana, inject the phantom widget
+      // at the very beginning of the line to match its rendered height.
+      if (addPhantomWidget) {
+        builder.add(
+          line.from,
+          line.from,
+          Decoration.widget({
+            widget: new PhantomRubyWidget(),
+            side: -1, // Ensures it sits at the absolute start of the line
+          }),
+        );
+      }
+
+      for (const widget of widgetsToAdd) {
+        builder.add(
+          widget.from,
+          widget.to,
+          Decoration.widget({
+            widget: new RubyWidget(widget.furiPairs)
+          }),
+        );
       }
     }
     return builder.finish();
